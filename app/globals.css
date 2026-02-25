@@ -1,0 +1,148 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+    Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f6f7fb;
+  color: #141824;
+}
+
+a {
+  color: #1d4ed8;
+}
+
+.page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #dde2f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.panel h1,
+.panel h2,
+.panel h3 {
+  margin-top: 0;
+}
+
+.form label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.row input {
+  flex: 1;
+  border: 1px solid #c7cfeb;
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  font-size: 1rem;
+}
+
+.row button {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #1f57e5;
+  color: #fff;
+}
+
+.row button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: #4a566f;
+}
+
+.excerpt {
+  margin: 0.75rem 0;
+}
+
+.error {
+  margin-top: 0.75rem;
+  color: #b91c1c;
+}
+
+.hint {
+  margin-top: 0.75rem;
+  margin-bottom: 0.4rem;
+  color: #36425c;
+  font-size: 0.92rem;
+}
+
+.resultsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.resultsList ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.resultsList li {
+  border-top: 1px solid #e2e7f5;
+  padding: 0.65rem 0;
+}
+
+.resultsList li:first-child {
+  border-top: 0;
+  padding-top: 0.2rem;
+}
+
+.chip {
+  margin-left: 0.5rem;
+  background: #e9efff;
+  color: #1e3a8a;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.evidence {
+  margin: 0.35rem 0 0;
+  font-size: 0.84rem;
+  color: #3f4960;
+}
+
+.linkRow {
+  margin: 0.35rem 0 0;
+  font-size: 0.86rem;
+}
+
+.linkRow a {
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  .row {
+    flex-direction: column;
+  }
+}
