@@ -22,6 +22,29 @@ interface ExtractionResponse {
   generatedAt: string;
 }
 
+function isErrorPayload(value: unknown): value is { error: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "error" in value &&
+    typeof (value as { error?: unknown }).error === "string"
+  );
+}
+
+function isExtractionResponse(value: unknown): value is ExtractionResponse {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<ExtractionResponse>;
+  return (
+    typeof candidate.generatedAt === "string" &&
+    Array.isArray(candidate.songs) &&
+    Array.isArray(candidate.albums) &&
+    typeof candidate.article?.title === "string"
+  );
+}
+
 function formatConfidence(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
 }
@@ -54,19 +77,20 @@ export default function HomePage() {
         body: JSON.stringify({ url: articleUrl })
       });
 
-      const payload = (await response.json()) as
-        | ExtractionResponse
-        | { error?: string };
+      const payload: unknown = await response.json();
 
       if (!response.ok) {
-        const message =
-          typeof payload.error === "string"
-            ? payload.error
-            : "Extraction request failed.";
+        const message = isErrorPayload(payload)
+          ? payload.error
+          : "Extraction request failed.";
         throw new Error(message);
       }
 
-      setResult(payload as ExtractionResponse);
+      if (!isExtractionResponse(payload)) {
+        throw new Error("Received an invalid extraction response.");
+      }
+
+      setResult(payload);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unknown extraction error."
