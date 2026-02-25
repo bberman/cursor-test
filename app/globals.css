@@ -132,6 +132,15 @@ a {
   color: #3f4960;
 }
 
+.linkRow {
+  margin: 0.35rem 0 0;
+  font-size: 0.86rem;
+}
+
+.linkRow a {
+  font-weight: 600;
+}
+
 @media (max-width: 700px) {
   .row {
     flex-direction: column;

@@ -6,6 +6,10 @@ interface MusicReference {
   type: "song" | "album";
   title: string;
   artist?: string;
+  deepLinks?: {
+    spotify: string;
+    youtube: string;
+  };
   confidence: number;
   evidence: string;
 }
@@ -62,8 +66,12 @@ function formatDuration(durationMs: number): string {
 }
 
 function formatReferenceDisplay(item: MusicReference): string {
+  if (item.artist) {
+    return `${item.artist} - ${item.title}`;
+  }
+
   if (item.type === "song") {
-    return `${item.artist ?? "Unknown Artist"} - ${item.title}`;
+    return `Unknown Artist - ${item.title}`;
   }
 
   return item.title;
@@ -216,9 +224,20 @@ function ResultList({
       ) : (
         <ul>
           {items.map((item) => (
-            <li key={`${item.type}-${item.title}`}>
+            <li key={`${item.type}-${item.artist ?? "unknown"}-${item.title}`}>
               <strong>{formatReferenceDisplay(item)}</strong>
               <span className="chip">{formatConfidence(item.confidence)}</span>
+              {item.deepLinks ? (
+                <p className="linkRow">
+                  <a href={item.deepLinks.spotify} target="_blank" rel="noreferrer">
+                    Spotify
+                  </a>
+                  <span aria-hidden="true"> · </span>
+                  <a href={item.deepLinks.youtube} target="_blank" rel="noreferrer">
+                    YouTube
+                  </a>
+                </p>
+              ) : null}
               <p className="evidence">{item.evidence}</p>
             </li>
           ))}

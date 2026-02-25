@@ -9,6 +9,8 @@ articles.
 - Fetches the article HTML
 - Uses Mozilla Readability to isolate article content
 - Extracts likely songs and albums with heuristic confidence scores
+- Attempts to infer artist names when possible
+- Adds Spotify and YouTube search deep links for each extracted item
 - Displays results in a simple web UI
 
 ## Tech stack
@@ -51,9 +53,14 @@ Response body:
   "songs": [
     {
       "type": "song",
+      "artist": "Artist Name",
       "title": "Song Name",
       "confidence": 0.83,
-      "evidence": "..."
+      "evidence": "...",
+      "deepLinks": {
+        "spotify": "https://open.spotify.com/search/Artist%20Name%20Song%20Name%20song",
+        "youtube": "https://www.youtube.com/results?search_query=Artist%20Name%20Song%20Name%20song"
+      }
     }
   ],
   "albums": [],

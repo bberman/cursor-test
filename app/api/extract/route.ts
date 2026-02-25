@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseArticleFromUrl } from "@/lib/article";
 import { extractMusicReferences } from "@/lib/musicExtractor";
+import { buildMusicDeepLinks } from "@/lib/deepLinks";
 
 export const runtime = "nodejs";
 
@@ -42,6 +43,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const article = await parseArticleFromUrl(sourceUrl);
     const extraction = extractMusicReferences(article.textContent);
+    const songs = extraction.songs.map((song) => ({
+      ...song,
+      deepLinks: buildMusicDeepLinks(song)
+    }));
+    const albums = extraction.albums.map((album) => ({
+      ...album,
+      deepLinks: buildMusicDeepLinks(album)
+    }));
 
     return NextResponse.json({
       article: {
@@ -51,8 +60,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         excerpt: article.excerpt,
         wordCount: article.textContent.split(/\s+/).filter(Boolean).length
       },
-      songs: extraction.songs,
-      albums: extraction.albums,
+      songs,
+      albums,
       generatedAt: new Date().toISOString()
     });
   } catch (error) {

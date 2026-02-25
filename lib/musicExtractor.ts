@@ -75,6 +75,26 @@ function normalizeArtist(raw: string): string {
     .replace(/\s+/g, " ");
 }
 
+function splitArtistAndTitleFromCandidate(raw: string): {
+  title: string;
+  artist?: string;
+} {
+  const normalized = normalizeTitle(raw);
+  const splitMatch = normalized.match(/^(.{1,60})\s[-–—]\s(.{1,90})$/);
+  if (!splitMatch) {
+    return { title: normalized };
+  }
+
+  const left = normalizeArtist(splitMatch[1]);
+  const right = normalizeTitle(splitMatch[2]);
+
+  if (shouldKeepArtistCandidate(left) && shouldKeepCandidate(right)) {
+    return { title: right, artist: left };
+  }
+
+  return { title: normalized };
+}
+
 function isMostlyTitleCase(value: string): boolean {
   const words = value.split(/\s+/).filter(Boolean);
   if (words.length === 0) {
@@ -250,7 +270,8 @@ function fromQuotedMentions(text: string): MusicReference[] {
 
   for (const match of text.matchAll(quotedPattern)) {
     const raw = match[1] ?? "";
-    const title = normalizeTitle(raw);
+    const parsed = splitArtistAndTitleFromCandidate(raw);
+    const title = parsed.title;
     const index = match.index ?? 0;
 
     if (!shouldKeepCandidate(title)) {
@@ -274,9 +295,7 @@ function fromQuotedMentions(text: string): MusicReference[] {
     const confidence = Math.min(0.55 + base * 0.1, 0.95);
     const artistContext = getEvidence(text, index, 220);
     const artist =
-      type === "song"
-        ? extractArtistFromContext(title, artistContext)
-        : undefined;
+      parsed.artist ?? extractArtistFromContext(title, artistContext);
 
     references.push({
       type,
@@ -308,8 +327,7 @@ function extractByPattern(
     }
 
     const context = getEvidence(text, index, 220);
-    const artist =
-      type === "song" ? extractArtistFromContext(title, context) : undefined;
+    const artist = extractArtistFromContext(title, context);
 
     references.push({
       type,
