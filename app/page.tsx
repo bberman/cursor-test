@@ -5,6 +5,7 @@ import { FormEvent, useMemo, useState } from "react";
 interface MusicReference {
   type: "song" | "album";
   title: string;
+  artist?: string;
   confidence: number;
   evidence: string;
 }
@@ -58,6 +59,14 @@ function formatConfidence(confidence: number): string {
 function formatDuration(durationMs: number): string {
   const seconds = durationMs / 1000;
   return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.round(seconds)}s`;
+}
+
+function formatReferenceDisplay(item: MusicReference): string {
+  if (item.type === "song") {
+    return `${item.artist ?? "Unknown Artist"} - ${item.title}`;
+  }
+
+  return item.title;
 }
 
 export default function HomePage() {
@@ -208,7 +217,7 @@ function ResultList({
         <ul>
           {items.map((item) => (
             <li key={`${item.type}-${item.title}`}>
-              <strong>{item.title}</strong>
+              <strong>{formatReferenceDisplay(item)}</strong>
               <span className="chip">{formatConfidence(item.confidence)}</span>
               <p className="evidence">{item.evidence}</p>
             </li>

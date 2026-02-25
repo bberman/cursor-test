@@ -3,6 +3,7 @@ export type MusicReferenceType = "song" | "album";
 export interface MusicReference {
   type: MusicReferenceType;
   title: string;
+  artist?: string;
   confidence: number;
   evidence: string;
 }
@@ -45,9 +46,30 @@ const IGNORE_TITLES = new Set([
   "youtube"
 ]);
 
+const IGNORE_ARTISTS = new Set([
+  "npr",
+  "spotify",
+  "apple music",
+  "youtube",
+  "tiktok",
+  "billboard",
+  "grammys"
+]);
+
+const CONNECTOR_WORDS = new Set(["and", "&", "the", "of", "with", "feat.", "ft."]);
+
 function normalizeTitle(raw: string): string {
   return raw
     .trim()
+    .replace(/^[\s"'“”‘’.,:;!?()[\]-]+/, "")
+    .replace(/[\s"'“”‘’.,:;!?()[\]-]+$/, "")
+    .replace(/\s+/g, " ");
+}
+
+function normalizeArtist(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^by\s+/i, "")
     .replace(/^[\s"'“”‘’.,:;!?()[\]-]+/, "")
     .replace(/[\s"'“”‘’.,:;!?()[\]-]+$/, "")
     .replace(/\s+/g, " ");
@@ -66,6 +88,28 @@ function isMostlyTitleCase(value: string): boolean {
     }
   }
   return titleCaseWords / words.length >= 0.5;
+}
+
+function hasLikelyArtistCasing(value: string): boolean {
+  const words = value.split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return false;
+  }
+
+  let validWords = 0;
+  for (const word of words) {
+    const lower = word.toLowerCase();
+    if (CONNECTOR_WORDS.has(lower)) {
+      validWords += 1;
+      continue;
+    }
+
+    if (/^[A-Z0-9]/.test(word)) {
+      validWords += 1;
+    }
+  }
+
+  return validWords / words.length >= 0.75;
 }
 
 function shouldKeepCandidate(value: string): boolean {
@@ -94,10 +138,77 @@ function shouldKeepCandidate(value: string): boolean {
   return isMostlyTitleCase(title);
 }
 
+function shouldKeepArtistCandidate(value: string): boolean {
+  const artist = normalizeArtist(value);
+  if (!artist) {
+    return false;
+  }
+
+  if (artist.length < 2 || artist.length > 60) {
+    return false;
+  }
+
+  const lower = artist.toLowerCase();
+  if (IGNORE_ARTISTS.has(lower)) {
+    return false;
+  }
+
+  const words = artist.split(/\s+/);
+  if (words.length > 6) {
+    return false;
+  }
+
+  if (!/[A-Za-z]/.test(artist)) {
+    return false;
+  }
+
+  if (/\b(song|album|record|track|single)\b/i.test(artist)) {
+    return false;
+  }
+
+  return hasLikelyArtistCasing(artist);
+}
+
 function getEvidence(text: string, index: number, radius = 110): string {
   const start = Math.max(0, index - radius);
   const end = Math.min(text.length, index + radius);
   return text.slice(start, end).replace(/\s+/g, " ").trim();
+}
+
+function escapeForRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractArtistFromContext(title: string, context: string): string | undefined {
+  const escapedTitle = escapeForRegex(title);
+  const artistPatterns = [
+    new RegExp(
+      `["“”']?${escapedTitle}["“”']?\\s+by\\s+([A-Z][A-Za-z0-9&'’.\\-]*(?:\\s+[A-Za-z0-9&'’.\\-]+){0,5})`,
+      "i"
+    ),
+    new RegExp(
+      `([A-Z][A-Za-z0-9&'’.\\-]*(?:\\s+[A-Za-z0-9&'’.\\-]+){0,5})['’]s\\s+["“”']?${escapedTitle}["“”']?`,
+      "i"
+    ),
+    new RegExp(
+      `by\\s+([A-Z][A-Za-z0-9&'’.\\-]*(?:\\s+[A-Za-z0-9&'’.\\-]+){0,5})[^.!?]{0,60}["“”']?${escapedTitle}["“”']?`,
+      "i"
+    )
+  ];
+
+  for (const pattern of artistPatterns) {
+    const match = context.match(pattern);
+    if (!match?.[1]) {
+      continue;
+    }
+
+    const artist = normalizeArtist(match[1]);
+    if (shouldKeepArtistCandidate(artist)) {
+      return artist;
+    }
+  }
+
+  return undefined;
 }
 
 function keywordHits(context: string, keywords: string[]): number {
@@ -112,8 +223,24 @@ function addReference(
 ): void {
   const key = `${candidate.type}:${candidate.title.toLowerCase()}`;
   const existing = bucket.get(key);
-  if (!existing || candidate.confidence > existing.confidence) {
+  if (!existing) {
     bucket.set(key, candidate);
+    return;
+  }
+
+  if (candidate.confidence > existing.confidence) {
+    bucket.set(key, {
+      ...candidate,
+      artist: candidate.artist ?? existing.artist
+    });
+    return;
+  }
+
+  if (!existing.artist && candidate.artist) {
+    bucket.set(key, {
+      ...existing,
+      artist: candidate.artist
+    });
   }
 }
 
@@ -130,12 +257,12 @@ function fromQuotedMentions(text: string): MusicReference[] {
       continue;
     }
 
-    const context = text
+    const classificationContext = text
       .slice(Math.max(0, index - 120), Math.min(text.length, index + 120))
       .toLowerCase();
 
-    const songScore = keywordHits(context, SONG_KEYWORDS);
-    const albumScore = keywordHits(context, ALBUM_KEYWORDS);
+    const songScore = keywordHits(classificationContext, SONG_KEYWORDS);
+    const albumScore = keywordHits(classificationContext, ALBUM_KEYWORDS);
 
     if (songScore === 0 && albumScore === 0) {
       continue;
@@ -145,10 +272,16 @@ function fromQuotedMentions(text: string): MusicReference[] {
       songScore >= albumScore ? "song" : "album";
     const base = type === "song" ? songScore : albumScore;
     const confidence = Math.min(0.55 + base * 0.1, 0.95);
+    const artistContext = getEvidence(text, index, 220);
+    const artist =
+      type === "song"
+        ? extractArtistFromContext(title, artistContext)
+        : undefined;
 
     references.push({
       type,
       title,
+      artist,
       confidence,
       evidence: getEvidence(text, index)
     });
@@ -174,9 +307,14 @@ function extractByPattern(
       continue;
     }
 
+    const context = getEvidence(text, index, 220);
+    const artist =
+      type === "song" ? extractArtistFromContext(title, context) : undefined;
+
     references.push({
       type,
       title,
+      artist,
       confidence,
       evidence: getEvidence(text, index)
     });
