@@ -22,6 +22,8 @@ interface ExtractionResponse {
   generatedAt: string;
 }
 
+const CLIENT_TIMEOUT_MS = 25_000;
+
 function isErrorPayload(value: unknown): value is { error: string } {
   return (
     typeof value === "object" &&
@@ -45,8 +47,17 @@ function isExtractionResponse(value: unknown): value is ExtractionResponse {
   );
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 function formatConfidence(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
+}
+
+function formatDuration(durationMs: number): string {
+  const seconds = durationMs / 1000;
+  return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.round(seconds)}s`;
 }
 
 export default function HomePage() {
@@ -54,6 +65,7 @@ export default function HomePage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ExtractionResponse | null>(null);
+  const [lastDurationMs, setLastDurationMs] = useState<number | null>(null);
 
   const totalMatches = useMemo(() => {
     if (!result) {
@@ -67,10 +79,16 @@ export default function HomePage() {
     setErrorMessage("");
     setResult(null);
     setIsLoading(true);
+    const startedAt = performance.now();
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, CLIENT_TIMEOUT_MS);
 
     try {
       const response = await fetch("/api/extract", {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "content-type": "application/json"
         },
@@ -92,10 +110,19 @@ export default function HomePage() {
 
       setResult(payload);
     } catch (error) {
+      const timeoutMessage = `Request timed out after ${Math.round(
+        CLIENT_TIMEOUT_MS / 1000
+      )} seconds. Some publisher sites block automated fetching; try another article URL or rerun.`;
       setErrorMessage(
-        error instanceof Error ? error.message : "Unknown extraction error."
+        isAbortError(error)
+          ? timeoutMessage
+          : error instanceof Error
+            ? error.message
+            : "Unknown extraction error."
       );
     } finally {
+      window.clearTimeout(timeoutId);
+      setLastDurationMs(Math.round(performance.now() - startedAt));
       setIsLoading(false);
     }
   }
@@ -124,6 +151,13 @@ export default function HomePage() {
             </button>
           </div>
         </form>
+        <p className="hint">
+          Most articles finish in 2-10 seconds. This request auto-times out
+          after {Math.round(CLIENT_TIMEOUT_MS / 1000)} seconds.
+        </p>
+        {lastDurationMs !== null ? (
+          <p className="muted">Last request took {formatDuration(lastDurationMs)}.</p>
+        ) : null}
         {errorMessage ? <p className="error">{errorMessage}</p> : null}
       </section>
 

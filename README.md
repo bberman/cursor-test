@@ -64,4 +64,6 @@ Response body:
 ## Notes
 
 - This is intentionally deterministic and keyless for fast MVP iteration.
-- Some sites block bots; if fetch fails, try another article URL.
+- Most extractions complete in a few seconds.
+- API fetches automatically time out after ~15s; the UI times out after ~25s.
+- Some sites block bots or return non-HTML; if fetch fails, try another article URL.

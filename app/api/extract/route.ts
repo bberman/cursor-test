@@ -8,6 +8,26 @@ interface ExtractRequestBody {
   url?: unknown;
 }
 
+function getErrorStatus(message: string): number {
+  if (/request body|valid url|supported|non-empty/i.test(message)) {
+    return 400;
+  }
+
+  if (/timed out/i.test(message)) {
+    return 504;
+  }
+
+  if (/failed to fetch|did not return html|too large|empty html/i.test(message)) {
+    return 502;
+  }
+
+  if (/could not extract|did not contain readable/i.test(message)) {
+    return 422;
+  }
+
+  return 500;
+}
+
 function getBodyUrl(body: ExtractRequestBody): string {
   if (typeof body.url !== "string" || !body.url.trim()) {
     throw new Error("Request body must include a non-empty `url` string.");
@@ -38,11 +58,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown extraction failure.";
-    const status = /request body|valid url|supported|failed to fetch|could not extract|did not contain/i.test(
-      message
-    )
-      ? 400
-      : 500;
+    const status = getErrorStatus(message);
 
     return NextResponse.json(
       {
